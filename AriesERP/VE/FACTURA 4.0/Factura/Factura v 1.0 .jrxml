@@ -16,22 +16,23 @@
 		</conditionalStyle>
 	</style>
 	<queryString>
-		<![CDATA[SELECT
+		<![CDATA[
+SELECT
     eccs_cliente.imagen as logo,
     -- ============== DATOS GENERALES DEL COMPROBANTE ==============
     eccs_tipo_comprobante.serie || '' || LPAD(eccs_comprobante_venta.folio::varchar, 7, '0') AS folio,
-    0.00 as comprobanteDesc,
+     '$' || to_char(coalesce(sum(eccs_comprobante_venta_info.descuento), 0), 'FM999,999,999.00') as comprobanteDesc,
     eccs_comprobante_venta.uuid,
     to_char(eccs_comprobante_venta.fecha_timbrado, 'YYYY-MM-DD"T"HH24:MI:SS') as fechatimbrado,
     
     -- ============== CALCULOS MONETARIOS ==============
-    '$' || to_char(eccs_comprobante_venta_info.valor_unitario, 'FM999,999,999.00') as "subTotal",
+    '$' || to_char(coalesce(sum(eccs_comprobante_venta_info.valor_unitario), 0), 'FM999,999,999.00') as subTotal,
+    '$' || to_char((coalesce(sum(eccs_comprobante_venta_info.valor_unitario), 0) +
+                COALESCE("arieserp_contabilidad".fn_get_TotalImpuestosTrasladados(1), 0) -
+                COALESCE("arieserp_contabilidad".fn_get_TotalImpuestosRetenidos(1), 0))::numeric(10,2), 'FM999,999,999.00') as total,
     eccs_moneda.prefijo as "Moneda",
     eccs_moneda.tc::varchar as "TipoCambio",
     '02 Si objeto de impuesto' as satObj,
-    '$' || to_char((eccs_comprobante_venta_info.valor_unitario +
-                    COALESCE("arieserp_contabilidad".fn_get_TotalImpuestosTrasladados(1), 0) -
-                    COALESCE("arieserp_contabilidad".fn_get_TotalImpuestosRetenidos(1), 0))::numeric(10,2), 'FM999,999,999.00') as "Total",
 
     -- ============== CLASIFICACION FISCAL ==============
     sat_comprobantes.indice || ' ' || sat_comprobantes.descripcion as "TipoDeComprobante",
@@ -64,19 +65,21 @@
     coalesce(eccs_comprobante_venta_info.descuento, '0.0') as conceptoDescuento,
 
     -- ============== IMPUESTOS TRASLADOS ==============
-    '$' || to_char(TRUNC((eccs_comprobante_venta_info.valor_unitario * (1 - eccs_comprobante_venta_info.descuento / 100))), 'FM999,999,999.00') as impuesto_base_traslado,
-    sat_impuesto_traslado.c_impuesto as impuesto_traslado,
-    sat_tipo_factor_traslado.descipcion as tipo_factor_traslado,
-    sat_impuesto_traslado.valor_maximo::varchar as tasa_cuota_traslado,
+    --'$' || to_char(TRUNC((eccs_comprobante_venta_info.valor_unitario * (1 - eccs_comprobante_venta_info.descuento / 100))), 'FM999,999,999.00') as impuesto_base_traslado,
+    ---sat_impuesto_traslado.c_impuesto as impuesto_traslado,
+    --sat_tipo_factor_traslado.descipcion as tipo_factor_traslado,
+    --sat_impuesto_traslado.valor_maximo::varchar as tasa_cuota_traslado,
     '$' || to_char(COALESCE(((COALESCE(eccs_comprobante_venta_info.valor_unitario, 0) * (1 - COALESCE(eccs_comprobante_venta_info.descuento, 0) / 100)) * COALESCE(sat_impuesto_traslado.valor, 0)), 0), '999,999,990.00') as importe_traslado,
-    
-    -- ============== IMPUESTOS RETENCIONES ==============
-    '$' || to_char((eccs_comprobante_venta_info.valor_unitario * (1 - eccs_comprobante_venta_info.descuento / 100)), 'FM999,999,999.00') as impuesto_base_retencion,
-    sat_impuesto_retencion.c_impuesto::varchar as impuesto_retencion,
-    sat_tipo_factor_retencion.descipcion as tipo_factor_retencion,
-    sat_impuesto_retencion.valor_maximo::varchar as tasa_cuota_retencion,
+    '$' || to_char(COALESCE("arieserp_contabilidad".fn_get_TotalImpuestosTrasladados(1), 0), '999,999,990.00')as total_importe_traslado,
+
+   -- ============== IMPUESTOS RETENCIONES ==============
+    --'$' || to_char((eccs_comprobante_venta_info.valor_unitario * (1 - eccs_comprobante_venta_info.descuento / 100)), 'FM999,999,999.00') as impuesto_base_retencion,
+    --sat_impuesto_retencion.c_impuesto::varchar as impuesto_retencion,
+    --sat_tipo_factor_retencion.descipcion as tipo_factor_retencion,
+    --sat_impuesto_retencion.valor_maximo::varchar as tasa_cuota_retencion,
     '$' || to_char(COALESCE(((COALESCE(eccs_comprobante_venta_info.valor_unitario, 0) * (1 - COALESCE(eccs_comprobante_venta_info.descuento, 0) / 100)) * COALESCE(sat_impuesto_retencion.valor, 0)), 0), '999,999,990.00') as importe_retencion,
-   
+    '$' || to_char(COALESCE("arieserp_contabilidad".fn_get_TotalImpuestosRetenidos(1), 0), '999,999,990.00')as total_importe_retencion,
+
     -- ============== FOOTER ==============
     -- Total con Letra usando función TOTAL_LETRA:
     "eccs".TOTAL_LETRA((eccs_comprobante_venta_info.valor_unitario +
@@ -131,7 +134,53 @@ FROM eccs_comprobante_venta
         AND sat_impuesto_retencion.traslado = false
         AND sat_impuesto_retencion.retencion = true
     LEFT JOIN sat_tipo_factor sat_tipo_factor_retencion ON sat_tipo_factor_retencion.id = sat_impuesto_retencion.id_sat_tipo_factor
-WHERE eccs_comprobante_venta.id = 1;]]>
+WHERE eccs_comprobante_venta.id = 1
+GROUP BY 
+    eccs_cliente.imagen,
+    eccs_tipo_comprobante.serie,
+    eccs_comprobante_venta.folio,
+    eccs_comprobante_venta.uuid,
+    eccs_comprobante_venta.fecha_timbrado,
+    eccs_moneda.prefijo,
+    eccs_moneda.tc,
+    sat_comprobantes.indice,
+    sat_comprobantes.descripcion,
+    sat_exportacion.codigo,
+    sat_exportacion.descripcion,
+    sat_metodo_pago.codigo,
+    sat_metodo_pago.descripcion,
+    sat_forma_pago.codigo,
+    sat_forma_pago.descripcion,
+    eccs_tipo_comprobante.cp,
+    eccs_tipo_comprobante.rfc,
+    eccs_tipo_comprobante.numerocertificado,
+    eccs_tipo_comprobante.razonsocial,
+    emisorRegimen.codigo,
+    emisorRegimen.descripcion,
+    arieserp_sucursal_domicilio.calle,
+    arieserp_sucursal_domicilio.num_ext,
+    eccs_cliente.rfc,
+    eccs_cliente.nombre,
+    eccs_cliente_domicilio.cp,
+    eccs_cliente_domicilio.calle,
+    sat_regimenfiscalcfdi.codigo,
+    sat_regimenfiscalcfdi.descripcion,
+    sat_usocfdi.codigo,
+    sat_usocfdi.descripcion,
+    sat_claveunidad.c_claveunidad,
+    sat_claveprodserv.codigo,
+    eccs_producto_servicio.descripcion,
+    eccs_comprobante_venta_info.cantidad,
+    eccs_comprobante_venta_info.valor_unitario,
+    eccs_comprobante_venta_info.descuento,
+    sat_impuesto_traslado.c_impuesto,
+    sat_tipo_factor_traslado.descipcion,
+    sat_impuesto_traslado.valor_maximo,
+    sat_impuesto_traslado.valor,
+    sat_impuesto_retencion.c_impuesto,
+    sat_tipo_factor_retencion.descipcion,
+    sat_impuesto_retencion.valor_maximo,
+    sat_impuesto_retencion.valor;]]>
 	</queryString>
 	<field name="logo" class="byte[]">
 		<property name="com.jaspersoft.studio.field.name" value="logo"/>
@@ -142,7 +191,7 @@ WHERE eccs_comprobante_venta.id = 1;]]>
 		<property name="com.jaspersoft.studio.field.name" value="folio"/>
 		<property name="com.jaspersoft.studio.field.label" value="folio"/>
 	</field>
-	<field name="comprobantedesc" class="java.math.BigDecimal">
+	<field name="comprobantedesc" class="java.lang.String">
 		<property name="com.jaspersoft.studio.field.name" value="comprobantedesc"/>
 		<property name="com.jaspersoft.studio.field.label" value="comprobantedesc"/>
 	</field>
@@ -155,9 +204,13 @@ WHERE eccs_comprobante_venta.id = 1;]]>
 		<property name="com.jaspersoft.studio.field.name" value="fechatimbrado"/>
 		<property name="com.jaspersoft.studio.field.label" value="fechatimbrado"/>
 	</field>
-	<field name="subTotal" class="java.lang.String">
-		<property name="com.jaspersoft.studio.field.name" value="subTotal"/>
-		<property name="com.jaspersoft.studio.field.label" value="subTotal"/>
+	<field name="subtotal" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="subtotal"/>
+		<property name="com.jaspersoft.studio.field.label" value="subtotal"/>
+	</field>
+	<field name="total" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="total"/>
+		<property name="com.jaspersoft.studio.field.label" value="total"/>
 	</field>
 	<field name="Moneda" class="java.lang.String">
 		<property name="com.jaspersoft.studio.field.name" value="Moneda"/>
@@ -171,10 +224,6 @@ WHERE eccs_comprobante_venta.id = 1;]]>
 	<field name="satobj" class="java.lang.String">
 		<property name="com.jaspersoft.studio.field.name" value="satobj"/>
 		<property name="com.jaspersoft.studio.field.label" value="satobj"/>
-	</field>
-	<field name="Total" class="java.lang.String">
-		<property name="com.jaspersoft.studio.field.name" value="Total"/>
-		<property name="com.jaspersoft.studio.field.label" value="Total"/>
 	</field>
 	<field name="TipoDeComprobante" class="java.lang.String">
 		<property name="com.jaspersoft.studio.field.name" value="TipoDeComprobante"/>
@@ -281,49 +330,21 @@ WHERE eccs_comprobante_venta.id = 1;]]>
 		<property name="com.jaspersoft.studio.field.label" value="conceptodescuento"/>
 		<property name="com.jaspersoft.studio.field.tree.path" value="eccs_comprobante_venta_info"/>
 	</field>
-	<field name="impuesto_base_traslado" class="java.lang.String">
-		<property name="com.jaspersoft.studio.field.name" value="impuesto_base_traslado"/>
-		<property name="com.jaspersoft.studio.field.label" value="impuesto_base_traslado"/>
-	</field>
-	<field name="impuesto_traslado" class="java.lang.String">
-		<property name="com.jaspersoft.studio.field.name" value="impuesto_traslado"/>
-		<property name="com.jaspersoft.studio.field.label" value="impuesto_traslado"/>
-		<property name="com.jaspersoft.studio.field.tree.path" value="sat_impuesto"/>
-	</field>
-	<field name="tipo_factor_traslado" class="java.lang.String">
-		<property name="com.jaspersoft.studio.field.name" value="tipo_factor_traslado"/>
-		<property name="com.jaspersoft.studio.field.label" value="tipo_factor_traslado"/>
-		<property name="com.jaspersoft.studio.field.tree.path" value="sat_tipo_factor"/>
-	</field>
-	<field name="tasa_cuota_traslado" class="java.lang.String">
-		<property name="com.jaspersoft.studio.field.name" value="tasa_cuota_traslado"/>
-		<property name="com.jaspersoft.studio.field.label" value="tasa_cuota_traslado"/>
-	</field>
 	<field name="importe_traslado" class="java.lang.String">
 		<property name="com.jaspersoft.studio.field.name" value="importe_traslado"/>
 		<property name="com.jaspersoft.studio.field.label" value="importe_traslado"/>
 	</field>
-	<field name="impuesto_base_retencion" class="java.lang.String">
-		<property name="com.jaspersoft.studio.field.name" value="impuesto_base_retencion"/>
-		<property name="com.jaspersoft.studio.field.label" value="impuesto_base_retencion"/>
-	</field>
-	<field name="impuesto_retencion" class="java.lang.String">
-		<property name="com.jaspersoft.studio.field.name" value="impuesto_retencion"/>
-		<property name="com.jaspersoft.studio.field.label" value="impuesto_retencion"/>
-		<property name="com.jaspersoft.studio.field.tree.path" value="sat_impuesto"/>
-	</field>
-	<field name="tipo_factor_retencion" class="java.lang.String">
-		<property name="com.jaspersoft.studio.field.name" value="tipo_factor_retencion"/>
-		<property name="com.jaspersoft.studio.field.label" value="tipo_factor_retencion"/>
-		<property name="com.jaspersoft.studio.field.tree.path" value="sat_tipo_factor"/>
-	</field>
-	<field name="tasa_cuota_retencion" class="java.lang.String">
-		<property name="com.jaspersoft.studio.field.name" value="tasa_cuota_retencion"/>
-		<property name="com.jaspersoft.studio.field.label" value="tasa_cuota_retencion"/>
+	<field name="total_importe_traslado" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="total_importe_traslado"/>
+		<property name="com.jaspersoft.studio.field.label" value="total_importe_traslado"/>
 	</field>
 	<field name="importe_retencion" class="java.lang.String">
 		<property name="com.jaspersoft.studio.field.name" value="importe_retencion"/>
 		<property name="com.jaspersoft.studio.field.label" value="importe_retencion"/>
+	</field>
+	<field name="total_importe_retencion" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="total_importe_retencion"/>
+		<property name="com.jaspersoft.studio.field.label" value="total_importe_retencion"/>
 	</field>
 	<field name="total_con_letra" class="java.lang.String">
 		<property name="com.jaspersoft.studio.field.name" value="total_con_letra"/>
@@ -333,154 +354,144 @@ WHERE eccs_comprobante_venta.id = 1;]]>
 		<band splitType="Stretch"/>
 	</background>
 	<title>
-		<band height="111" splitType="Stretch">
+		<band height="193" splitType="Stretch">
 			<textField>
-				<reportElement x="280" y="20" width="110" height="24" uuid="e9cf3206-2fbf-4d30-8e00-ec8da7d0f141"/>
-				<textElement>
-					<font size="10" isBold="true"/>
-				</textElement>
-				<textFieldExpression><![CDATA[$F{rfcemisor}]]></textFieldExpression>
-			</textField>
-			<staticText>
-				<reportElement x="120" y="20" width="160" height="24" uuid="895d0ed7-2ccb-4195-80cd-e32ba9c89d62"/>
-				<box leftPadding="2" rightPadding="2"/>
-				<textElement textAlignment="Right">
-					<font isBold="true"/>
-				</textElement>
-				<text><![CDATA[RFC: ]]></text>
-			</staticText>
-			<textField>
-				<reportElement x="120" y="0" width="270" height="20" uuid="f98aaa1b-e77b-408d-9e2b-83a84600b072"/>
+				<reportElement x="112" y="50" width="238" height="20" uuid="e9cf3206-2fbf-4d30-8e00-ec8da7d0f141"/>
 				<textElement textAlignment="Center">
 					<font size="10" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA["R.F.C.: "+$F{rfcemisor}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="0" y="12" width="554" height="38" uuid="f98aaa1b-e77b-408d-9e2b-83a84600b072"/>
+				<textElement textAlignment="Center">
+					<font size="22" isBold="true"/>
 				</textElement>
 				<textFieldExpression><![CDATA[$F{nombreemisor}]]></textFieldExpression>
 			</textField>
 			<textField>
-				<reportElement x="120" y="44" width="270" height="12" uuid="75a6d76a-ba9d-4404-9fde-88bf528339c4"/>
+				<reportElement x="112" y="70" width="238" height="15" uuid="75a6d76a-ba9d-4404-9fde-88bf528339c4">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
 				<textElement textAlignment="Center">
-					<font size="8"/>
+					<font size="8" isBold="true"/>
 				</textElement>
 				<textFieldExpression><![CDATA[$F{emisordomicilio}]]></textFieldExpression>
 			</textField>
 			<textField>
-				<reportElement x="280" y="80" width="110" height="24" uuid="3e054331-f4bc-4bd5-9dc3-c22a2c25ca3e"/>
+				<reportElement x="112" y="100" width="238" height="15" uuid="3e054331-f4bc-4bd5-9dc3-c22a2c25ca3e">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
 				<textElement textAlignment="Center">
-					<font size="8"/>
-				</textElement>
-				<textFieldExpression><![CDATA[$F{telefonosucursal}]]></textFieldExpression>
-			</textField>
-			<staticText>
-				<reportElement x="120" y="80" width="160" height="24" uuid="0eb8d0bd-64ac-4354-ba16-6eb45a6a45fe"/>
-				<box leftPadding="2" rightPadding="2"/>
-				<textElement textAlignment="Right">
 					<font size="8" isBold="true"/>
 				</textElement>
-				<text><![CDATA[TEL.: ]]></text>
-			</staticText>
+				<textFieldExpression><![CDATA["TEL.:"+$F{telefonosucursal}]]></textFieldExpression>
+			</textField>
 			<textField>
-				<reportElement x="120" y="56" width="270" height="12" uuid="503fa354-ac29-4cdb-9394-fa07755a35fb"/>
+				<reportElement x="112" y="85" width="238" height="15" uuid="503fa354-ac29-4cdb-9394-fa07755a35fb">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
 				<textElement textAlignment="Center">
-					<font size="8"/>
+					<font size="8" isBold="true"/>
 				</textElement>
 				<textFieldExpression><![CDATA[$F{regimenfiscalemisor}]]></textFieldExpression>
 			</textField>
-			<image>
-				<reportElement x="0" y="20" width="120" height="60" uuid="bf55a4d3-bc5e-46af-bc6b-902bdb413357"/>
+			<image hAlign="Center">
+				<reportElement x="0" y="50" width="112" height="65" uuid="bf55a4d3-bc5e-46af-bc6b-902bdb413357"/>
 				<imageExpression><![CDATA[$F{logo}]]></imageExpression>
 			</image>
 			<staticText>
-				<reportElement mode="Opaque" x="400" y="0" width="155" height="20" forecolor="#FFFFFF" backcolor="#244E73" uuid="85b80272-5b10-4c6b-b58d-9a72a00f7967">
+				<reportElement mode="Opaque" x="350" y="50" width="205" height="20" forecolor="#FFFFFF" backcolor="#244E73" uuid="85b80272-5b10-4c6b-b58d-9a72a00f7967">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<box leftPadding="2"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="12"/>
+				</textElement>
+				<text><![CDATA[FACTURA]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="350" y="70" width="205" height="15" uuid="6290201a-97a6-43d4-a169-fba1382a7c43">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<box leftPadding="2"/>
+				<textElement textAlignment="Center">
+					<font size="10"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{folio}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement mode="Opaque" x="350" y="85" width="205" height="15" forecolor="#FFFFFF" backcolor="#244E73" uuid="2b14dfbc-c76f-4db6-9d23-89ca0908cb95">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<box leftPadding="2"/>
+				<textElement textAlignment="Center">
+					<font size="10"/>
+				</textElement>
+				<text><![CDATA[Certificado Emisor]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="350" y="100" width="205" height="15" uuid="17bf9585-3b5e-42f4-8c26-4cd66d4695a9"/>
+				<box leftPadding="2"/>
+				<textElement textAlignment="Center">
+					<font size="10"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{numerocertificado}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement mode="Opaque" x="350" y="115" width="205" height="15" forecolor="#FFFFFF" backcolor="#244E73" uuid="dcd52daf-a69f-4048-8cb8-4698740f03b7"/>
+				<box leftPadding="2"/>
+				<textElement textAlignment="Center">
+					<font size="10"/>
+				</textElement>
+				<text><![CDATA[Folio Fiscal]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="350" y="130" width="205" height="15" uuid="47845a4e-ee65-48aa-afb9-5884059ab6e7"/>
+				<box leftPadding="2"/>
+				<textElement textAlignment="Center">
+					<font size="10"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{uuid}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement mode="Opaque" x="350" y="145" width="205" height="15" forecolor="#FFFFFF" backcolor="#244E73" uuid="b53c5a79-fcea-4869-886e-a34f6a0abc80"/>
+				<box leftPadding="2"/>
+				<textElement textAlignment="Center">
+					<font size="10"/>
+				</textElement>
+				<text><![CDATA[Fecha Timbrado]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="350" y="160" width="205" height="15" uuid="5ba1c016-ec56-4782-b1ab-0be013a5179e"/>
+				<box leftPadding="2"/>
+				<textElement textAlignment="Center">
+					<font size="10"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{fechatimbrado}]]></textFieldExpression>
+			</textField>
+			<rectangle>
+				<reportElement mode="Transparent" x="350" y="50" width="205" height="125" backcolor="#05F26C" uuid="a4e84a2a-82b3-42ec-9740-8fb527615c69"/>
+				<graphicElement>
+					<pen lineWidth="0.25"/>
+				</graphicElement>
+			</rectangle>
+			<line>
+				<reportElement positionType="FixRelativeToBottom" x="-2" y="180" width="555" height="1" uuid="2feddbd1-550a-4bfa-a1bb-70aa53298688"/>
+				<graphicElement>
+					<pen lineWidth="0.5" lineColor="#999999"/>
+				</graphicElement>
+			</line>
+			<staticText>
+				<reportElement mode="Opaque" x="0" y="0" width="555" height="12" forecolor="#FFFFFF" backcolor="#244E73" uuid="6c22581c-cdd2-4894-bbd1-60b1cbbe24ae">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<box leftPadding="2"/>
 				<textElement textAlignment="Center" verticalAlignment="Middle">
 					<font size="8"/>
 				</textElement>
-				<text><![CDATA[FACTURA]]></text>
+				<text><![CDATA[]]></text>
 			</staticText>
-			<textField>
-				<reportElement x="400" y="20" width="155" height="12" uuid="6290201a-97a6-43d4-a169-fba1382a7c43">
-					<property name="com.jaspersoft.studio.unit.height" value="px"/>
-				</reportElement>
-				<box leftPadding="2"/>
-				<textElement textAlignment="Center">
-					<font size="8"/>
-				</textElement>
-				<textFieldExpression><![CDATA[$F{folio}]]></textFieldExpression>
-			</textField>
-			<staticText>
-				<reportElement mode="Opaque" x="400" y="32" width="155" height="12" forecolor="#FFFFFF" backcolor="#244E73" uuid="2b14dfbc-c76f-4db6-9d23-89ca0908cb95">
-					<property name="com.jaspersoft.studio.unit.height" value="px"/>
-				</reportElement>
-				<box leftPadding="2"/>
-				<textElement textAlignment="Center">
-					<font size="8"/>
-				</textElement>
-				<text><![CDATA[Certificado Emisor]]></text>
-			</staticText>
-			<textField>
-				<reportElement x="400" y="44" width="155" height="12" uuid="17bf9585-3b5e-42f4-8c26-4cd66d4695a9">
-					<property name="com.jaspersoft.studio.unit.height" value="px"/>
-				</reportElement>
-				<box leftPadding="2"/>
-				<textElement textAlignment="Center">
-					<font size="8"/>
-				</textElement>
-				<textFieldExpression><![CDATA[$F{numerocertificado}]]></textFieldExpression>
-			</textField>
-			<staticText>
-				<reportElement mode="Opaque" x="400" y="56" width="155" height="12" forecolor="#FFFFFF" backcolor="#244E73" uuid="dcd52daf-a69f-4048-8cb8-4698740f03b7">
-					<property name="com.jaspersoft.studio.unit.height" value="px"/>
-				</reportElement>
-				<box leftPadding="2"/>
-				<textElement textAlignment="Center">
-					<font size="8"/>
-				</textElement>
-				<text><![CDATA[Folio Fiscal]]></text>
-			</staticText>
-			<textField>
-				<reportElement x="400" y="68" width="155" height="12" uuid="47845a4e-ee65-48aa-afb9-5884059ab6e7">
-					<property name="com.jaspersoft.studio.unit.height" value="px"/>
-				</reportElement>
-				<box leftPadding="2"/>
-				<textElement textAlignment="Center">
-					<font size="8"/>
-				</textElement>
-				<textFieldExpression><![CDATA[$F{uuid}]]></textFieldExpression>
-			</textField>
-			<staticText>
-				<reportElement mode="Opaque" x="400" y="80" width="155" height="12" forecolor="#FFFFFF" backcolor="#244E73" uuid="b53c5a79-fcea-4869-886e-a34f6a0abc80">
-					<property name="com.jaspersoft.studio.unit.height" value="px"/>
-				</reportElement>
-				<box leftPadding="2"/>
-				<textElement textAlignment="Center">
-					<font size="8"/>
-				</textElement>
-				<text><![CDATA[Fecha Timbrado]]></text>
-			</staticText>
-			<textField>
-				<reportElement x="400" y="92" width="155" height="12" uuid="5ba1c016-ec56-4782-b1ab-0be013a5179e">
-					<property name="com.jaspersoft.studio.unit.height" value="px"/>
-				</reportElement>
-				<box leftPadding="2"/>
-				<textElement textAlignment="Center">
-					<font size="8"/>
-				</textElement>
-				<textFieldExpression><![CDATA[$F{fechatimbrado}]]></textFieldExpression>
-			</textField>
-			<rectangle>
-				<reportElement mode="Transparent" x="400" y="0" width="155" height="104" backcolor="#05F26C" uuid="a4e84a2a-82b3-42ec-9740-8fb527615c69"/>
-				<graphicElement>
-					<pen lineWidth="0.25"/>
-				</graphicElement>
-			</rectangle>
-			<line>
-				<reportElement positionType="FixRelativeToBottom" x="0" y="107" width="555" height="1" uuid="2feddbd1-550a-4bfa-a1bb-70aa53298688"/>
-				<graphicElement>
-					<pen lineWidth="0.5" lineColor="#999999"/>
-				</graphicElement>
-			</line>
 		</band>
 	</title>
 	<pageHeader>
@@ -936,7 +947,7 @@ WHERE eccs_comprobante_venta.id = 1;]]>
 				<textElement textAlignment="Center">
 					<font size="8"/>
 				</textElement>
-				<textFieldExpression><![CDATA[$F{importe_traslado}]]></textFieldExpression>
+				<textFieldExpression><![CDATA[$F{total_importe_traslado}]]></textFieldExpression>
 			</textField>
 			<textField>
 				<reportElement x="489" y="0" width="66" height="11" uuid="cdfb620a-c61d-40fc-9e2f-67fa5f44d4f5">
@@ -1064,7 +1075,7 @@ WHERE eccs_comprobante_venta.id = 1;]]>
 				<textElement textAlignment="Center">
 					<font size="8"/>
 				</textElement>
-				<textFieldExpression><![CDATA[$F{importe_retencion}]]></textFieldExpression>
+				<textFieldExpression><![CDATA[$F{total_importe_retencion}]]></textFieldExpression>
 			</textField>
 		</band>
 	</detail>
@@ -1077,7 +1088,7 @@ WHERE eccs_comprobante_venta.id = 1;]]>
 				</graphicElement>
 			</line>
 			<staticText>
-				<reportElement x="0" y="18" width="50" height="12" uuid="cfa706c9-9433-4c1f-bb52-984e0cff4aa1">
+				<reportElement x="0" y="18" width="50" height="11" uuid="cfa706c9-9433-4c1f-bb52-984e0cff4aa1">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<box leftPadding="2">
@@ -1092,7 +1103,7 @@ WHERE eccs_comprobante_venta.id = 1;]]>
 				<text><![CDATA[SON:]]></text>
 			</staticText>
 			<textField>
-				<reportElement x="50" y="18" width="386" height="12" uuid="620d212a-b335-41ac-970c-da71463d52f2">
+				<reportElement x="50" y="18" width="386" height="11" uuid="620d212a-b335-41ac-970c-da71463d52f2">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<box leftPadding="2">
@@ -1208,8 +1219,8 @@ nnjMh9wXXpgzS4p3ytzh7VIF4hJojdy1CH4QAoDXcDPpVumzAPfBj9PjjXMLp3/2TvS44Z11yScVo0SD
 				</textElement>
 				<text><![CDATA[Suma:]]></text>
 			</staticText>
-			<staticText>
-				<reportElement x="489" y="18" width="66" height="11" uuid="38052998-5ea6-4219-9e61-4d7b990f4943">
+			<textField>
+				<reportElement x="489" y="18" width="66" height="11" uuid="7724eabb-9b92-4259-80eb-eb4da9587b59">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<box leftPadding="2">
@@ -1219,11 +1230,11 @@ nnjMh9wXXpgzS4p3ytzh7VIF4hJojdy1CH4QAoDXcDPpVumzAPfBj9PjjXMLp3/2TvS44Z11yScVo0SD
 					<bottomPen lineWidth="0.25" lineStyle="Solid" lineColor="#000000"/>
 					<rightPen lineWidth="0.25" lineStyle="Solid" lineColor="#000000"/>
 				</box>
-				<textElement textAlignment="Center">
+				<textElement textAlignment="Left">
 					<font size="8"/>
 				</textElement>
-				<text><![CDATA[26,110.05]]></text>
-			</staticText>
+				<textFieldExpression><![CDATA[$F{subtotal}]]></textFieldExpression>
+			</textField>
 			<staticText>
 				<reportElement x="436" y="29" width="53" height="11" uuid="ff20b489-25d7-451d-b0aa-4fd72f896eb7">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
@@ -1250,7 +1261,7 @@ nnjMh9wXXpgzS4p3ytzh7VIF4hJojdy1CH4QAoDXcDPpVumzAPfBj9PjjXMLp3/2TvS44Z11yScVo0SD
 					<bottomPen lineWidth="0.25" lineStyle="Solid" lineColor="#000000"/>
 					<rightPen lineWidth="0.25" lineStyle="Solid" lineColor="#000000"/>
 				</box>
-				<textElement textAlignment="Center">
+				<textElement textAlignment="Left">
 					<font size="8"/>
 				</textElement>
 				<textFieldExpression><![CDATA[$F{comprobantedesc}]]></textFieldExpression>
@@ -1270,8 +1281,8 @@ nnjMh9wXXpgzS4p3ytzh7VIF4hJojdy1CH4QAoDXcDPpVumzAPfBj9PjjXMLp3/2TvS44Z11yScVo0SD
 				</textElement>
 				<text><![CDATA[IVA:]]></text>
 			</staticText>
-			<staticText>
-				<reportElement x="489" y="40" width="66" height="11" uuid="1bd78a3f-c386-4365-8247-f08dd243d8b9">
+			<textField>
+				<reportElement x="489" y="40" width="66" height="11" uuid="cc9077dd-d3f1-4e95-9f04-f080642bc1e3">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<box leftPadding="2">
@@ -1281,11 +1292,11 @@ nnjMh9wXXpgzS4p3ytzh7VIF4hJojdy1CH4QAoDXcDPpVumzAPfBj9PjjXMLp3/2TvS44Z11yScVo0SD
 					<bottomPen lineWidth="0.25" lineStyle="Solid" lineColor="#000000"/>
 					<rightPen lineWidth="0.25" lineStyle="Solid" lineColor="#000000"/>
 				</box>
-				<textElement textAlignment="Center">
+				<textElement textAlignment="Left">
 					<font size="8"/>
 				</textElement>
-				<text><![CDATA[26,110.05]]></text>
-			</staticText>
+				<textFieldExpression><![CDATA[$F{total_importe_traslado}]]></textFieldExpression>
+			</textField>
 			<staticText>
 				<reportElement x="436" y="51" width="53" height="11" uuid="31b58023-b4d7-4d6d-8ad6-f4cad21c20af">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
@@ -1301,8 +1312,8 @@ nnjMh9wXXpgzS4p3ytzh7VIF4hJojdy1CH4QAoDXcDPpVumzAPfBj9PjjXMLp3/2TvS44Z11yScVo0SD
 				</textElement>
 				<text><![CDATA[Total:]]></text>
 			</staticText>
-			<staticText>
-				<reportElement x="489" y="51" width="66" height="11" uuid="992ee5e0-99b1-414a-a1f3-029f5a03deb5">
+			<textField>
+				<reportElement x="489" y="51" width="66" height="11" uuid="a0ecbb42-3cd9-4d78-b7be-d1f8e90bd187">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<box leftPadding="2">
@@ -1312,11 +1323,11 @@ nnjMh9wXXpgzS4p3ytzh7VIF4hJojdy1CH4QAoDXcDPpVumzAPfBj9PjjXMLp3/2TvS44Z11yScVo0SD
 					<bottomPen lineWidth="0.25" lineStyle="Solid" lineColor="#000000"/>
 					<rightPen lineWidth="0.25" lineStyle="Solid" lineColor="#000000"/>
 				</box>
-				<textElement textAlignment="Center">
+				<textElement textAlignment="Left">
 					<font size="8"/>
 				</textElement>
-				<text><![CDATA[26,110.05]]></text>
-			</staticText>
+				<textFieldExpression><![CDATA[$F{total}]]></textFieldExpression>
+			</textField>
 			<staticText>
 				<reportElement mode="Opaque" x="0" y="68" width="555" height="12" forecolor="#FFFFFF" backcolor="#244E73" uuid="15305225-6cb2-455b-a709-ea40d8986dbf">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
