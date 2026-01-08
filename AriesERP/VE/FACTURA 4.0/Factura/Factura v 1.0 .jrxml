@@ -3,8 +3,8 @@
 <jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="Cherry" pageWidth="595" pageHeight="842" columnWidth="535" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="13acf49e-4913-4d1b-bccc-113817ad15d1">
 	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="DEV"/>
 	<property name="com.jaspersoft.studio.data.sql.tables" value=""/>
-	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w1" value="321"/>
-	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w2" value="671"/>
+	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w1" value="189"/>
+	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w2" value="806"/>
 	<style name="Title" forecolor="#FFFFFF" fontName="Times New Roman" fontSize="50" isBold="false"/>
 	<style name="SubTitle" forecolor="#CCCCCC" fontName="Times New Roman" fontSize="18" isBold="false"/>
 	<style name="Column header" forecolor="#666666" fontName="Times New Roman" fontSize="14" isBold="true"/>
@@ -16,15 +16,17 @@
 		</conditionalStyle>
 	</style>
 	<queryString>
-		<![CDATA[
-SELECT
+		<![CDATA[SELECT
     eccs_cliente.imagen as logo,
+    eccs_comprobante_venta.sellocfd,
+    eccs_comprobante_venta.sellosat,
+    eccs_comprobante_venta.cadena_certificado_sat,
     -- ============== DATOS GENERALES DEL COMPROBANTE ==============
     eccs_tipo_comprobante.serie || '' || LPAD(eccs_comprobante_venta.folio::varchar, 7, '0') AS folio,
      '$' || to_char(coalesce(sum(eccs_comprobante_venta_info.descuento), 0), 'FM999,999,999.00') as comprobanteDesc,
     eccs_comprobante_venta.uuid,
     to_char(eccs_comprobante_venta.fecha_timbrado, 'YYYY-MM-DD"T"HH24:MI:SS') as fechatimbrado,
-    
+
     -- ============== CALCULOS MONETARIOS ==============
     '$' || to_char(coalesce(sum(eccs_comprobante_venta_info.valor_unitario), 0), 'FM999,999,999.00') as subTotal,
     '$' || to_char((coalesce(sum(eccs_comprobante_venta_info.valor_unitario), 0) +
@@ -86,57 +88,60 @@ SELECT
                         COALESCE("arieserp_contabilidad".fn_get_TotalImpuestosTrasladados(1), 0) -
                         COALESCE("arieserp_contabilidad".fn_get_TotalImpuestosRetenidos(1), 0))::NUMERIC) ||
     ' PESOS CON ' ||
-    LPAD(ROUND(MOD((eccs_comprobante_venta_info.valor_unitario + 
+    LPAD(ROUND(MOD((eccs_comprobante_venta_info.valor_unitario +
                    COALESCE("arieserp_contabilidad".fn_get_TotalImpuestosTrasladados(1), 0) -
-                   COALESCE("arieserp_contabilidad".fn_get_TotalImpuestosRetenidos(1), 0))::numeric, 1) * 100)::varchar, 2, '0') || 
+                   COALESCE("arieserp_contabilidad".fn_get_TotalImpuestosRetenidos(1), 0))::numeric, 1) * 100)::varchar, 2, '0') ||
     '/100 M.N.' as total_con_letra
 
 FROM eccs_comprobante_venta
     INNER JOIN eccs_tipo_comprobante ON eccs_comprobante_venta.id_eccs_tipo_comprobante = eccs_tipo_comprobante.id
     INNER JOIN sat_regimenfiscalcfdi as emisorRegimen ON emisorRegimen.id = eccs_tipo_comprobante.id_sat_regimenfiscalcfdi
     INNER JOIN eccs_moneda ON eccs_comprobante_venta.id_eccs_moneda = eccs_moneda.id
-    
+
     -- ============== DOMICILIO SUCURSAL ==============
     INNER JOIN arieserp_sucursal ON arieserp_sucursal.id = eccs_comprobante_venta.id_eccs_sucursal
     INNER JOIN arieserp_empresa ON arieserp_empresa.id = arieserp_sucursal.id_empresa
     INNER JOIN arieserp_sucursal_domicilio ON arieserp_sucursal_domicilio.id_sucursal = arieserp_sucursal.id
         AND arieserp_sucursal_domicilio.id_sucursal = eccs_comprobante_venta.id_eccs_sucursal
         AND arieserp_sucursal_domicilio.predeterminado = true
-    
+
     -- ============== CATALOGOS DE SAT ==============
     INNER JOIN sat_comprobantes ON sat_comprobantes.id = eccs_comprobante_venta.id_sat_comprobantes
     INNER JOIN sat_forma_pago ON sat_forma_pago.id = eccs_comprobante_venta.id_sat_forma_pago
     INNER JOIN sat_exportacion ON sat_exportacion.id = eccs_comprobante_venta.id_sat_exportacion
     INNER JOIN sat_metodo_pago ON sat_metodo_pago.id = eccs_comprobante_venta.id_sat_metodo_pago
-    
+
     -- ============== CLIENTE ==============
     INNER JOIN eccs_cliente ON eccs_comprobante_venta.id_eccs_cliente = eccs_cliente.id
     INNER JOIN eccs_cliente_domicilio ON eccs_cliente_domicilio.id_eccs_cliente = eccs_cliente.id
     INNER JOIN sat_regimenfiscalcfdi ON sat_regimenfiscalcfdi.id = eccs_cliente.id_sat_regimenfiscalcfdi
     INNER JOIN sat_usocfdi ON sat_usocfdi.id = eccs_cliente.id_sat_usocfdi
-    
+
     -- ============== Conceptos ==============
     INNER JOIN eccs_comprobante_venta_info ON eccs_comprobante_venta_info.id_eccs_comprobante_venta = eccs_comprobante_venta.id
     INNER JOIN eccs_producto_servicio ON eccs_producto_servicio.id = eccs_comprobante_venta_info.id_eccs_producto_servicio
     INNER JOIN sat_claveprodserv ON sat_claveprodserv.id = eccs_producto_servicio.id_sat_claveprodserv
     INNER JOIN sat_claveunidad ON sat_claveunidad.id = eccs_producto_servicio.id_sat_claveunidad
-    
+
     -- ============== IMPUESTOS TRASLADOS ==============
     LEFT JOIN eccs_producto_servicio_impuesto psi_traslado ON psi_traslado.id_eccs_producto_servicio = eccs_producto_servicio.id
     LEFT JOIN sat_impuesto sat_impuesto_traslado ON sat_impuesto_traslado.id = psi_traslado.id_sat_impuesto
         AND sat_impuesto_traslado.traslado = true
         AND sat_impuesto_traslado.retencion = false
     LEFT JOIN sat_tipo_factor sat_tipo_factor_traslado ON sat_tipo_factor_traslado.id = sat_impuesto_traslado.id_sat_tipo_factor
-    
+
     -- ============== IMPUESTOS RETENCIONES ==============
     LEFT JOIN eccs_producto_servicio_impuesto psi_retencion ON psi_retencion.id_eccs_producto_servicio = eccs_producto_servicio.id
     LEFT JOIN sat_impuesto sat_impuesto_retencion ON sat_impuesto_retencion.id = psi_retencion.id_sat_impuesto
         AND sat_impuesto_retencion.traslado = false
         AND sat_impuesto_retencion.retencion = true
     LEFT JOIN sat_tipo_factor sat_tipo_factor_retencion ON sat_tipo_factor_retencion.id = sat_impuesto_retencion.id_sat_tipo_factor
-WHERE eccs_comprobante_venta.id = 1
-GROUP BY 
+WHERE eccs_comprobante_venta.id = 30
+GROUP BY
     eccs_cliente.imagen,
+    eccs_comprobante_venta.cadena_certificado_sat,
+    eccs_comprobante_venta.sellosat,
+    eccs_comprobante_venta.sellocfd,
     eccs_tipo_comprobante.serie,
     eccs_comprobante_venta.folio,
     eccs_comprobante_venta.uuid,
@@ -186,6 +191,21 @@ GROUP BY
 		<property name="com.jaspersoft.studio.field.name" value="logo"/>
 		<property name="com.jaspersoft.studio.field.label" value="logo"/>
 		<property name="com.jaspersoft.studio.field.tree.path" value="eccs_cliente"/>
+	</field>
+	<field name="sellocfd" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="sellocfd"/>
+		<property name="com.jaspersoft.studio.field.label" value="sellocfd"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="eccs_comprobante_venta"/>
+	</field>
+	<field name="sellosat" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="sellosat"/>
+		<property name="com.jaspersoft.studio.field.label" value="sellosat"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="eccs_comprobante_venta"/>
+	</field>
+	<field name="cadena_certificado_sat" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="cadena_certificado_sat"/>
+		<property name="com.jaspersoft.studio.field.label" value="cadena_certificado_sat"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="eccs_comprobante_venta"/>
 	</field>
 	<field name="folio" class="java.lang.String">
 		<property name="com.jaspersoft.studio.field.name" value="folio"/>
@@ -396,8 +416,8 @@ GROUP BY
 				</textElement>
 				<textFieldExpression><![CDATA[$F{regimenfiscalemisor}]]></textFieldExpression>
 			</textField>
-			<image hAlign="Center">
-				<reportElement x="0" y="50" width="112" height="65" uuid="bf55a4d3-bc5e-46af-bc6b-902bdb413357"/>
+			<image hAlign="Center" vAlign="Top" evaluationTime="Auto">
+				<reportElement x="0" y="12" width="112" height="103" uuid="bf55a4d3-bc5e-46af-bc6b-902bdb413357"/>
 				<imageExpression><![CDATA[$F{logo}]]></imageExpression>
 			</image>
 			<staticText>
@@ -1117,14 +1137,8 @@ GROUP BY
 				</textElement>
 				<textFieldExpression><![CDATA[$F{total_con_letra}]]></textFieldExpression>
 			</textField>
-			<rectangle>
-				<reportElement mode="Opaque" x="0" y="80" width="112" height="80" forecolor="#FFFF99" backcolor="#FFFFCC" uuid="3231f9b7-fadd-45bf-b6bb-dd25db005b83"/>
-				<graphicElement>
-					<pen lineWidth="0.25"/>
-				</graphicElement>
-			</rectangle>
-			<staticText>
-				<reportElement x="112" y="80" width="443" height="80" uuid="7935b420-b1ec-4120-a4a6-e1427b68b48c">
+			<textField>
+				<reportElement x="111" y="80" width="444" height="68" uuid="5a431d0b-c130-456a-8764-b6a0e627d52d">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<box leftPadding="4">
@@ -1136,13 +1150,10 @@ GROUP BY
 				<textElement>
 					<font size="8"/>
 				</textElement>
-				<text><![CDATA[IHYIy5UdBiWUfZV5kR+1ClKASQCWFtxmDE9fTpXaBZTbzaNb12knt6RK2+m/jUho8U+mOtwXzonnjMh9wXXpgzS4p3ytzh7VIF4hJojdy1CH
-4QAoDXcDPpVumzAPfBj9PjjXMLp3/2TvS44Z11yScVo0SD4yM5oJZAuWwMteKx93i9dtiVJyAFC8UpJYxYnKuHZ54z7SXkADdLt36LM6o15
-HMqSdqNBP3P0Vi1L7KazPPQyG6jS0CTcI2BrDZ/F/lUtg18KX/8iv+X0e/h5/cZIYluHZzI/iYay8fVGF1azfgJh035RHMpo5fcN4ZDN/5MI2oc+gkb
-byu6z7gG2B9A==]]></text>
-			</staticText>
-			<staticText>
-				<reportElement x="0" y="189" width="555" height="48" uuid="2f7c03f8-466f-45b9-870f-9ff38a7d42fc">
+				<textFieldExpression><![CDATA[$F{sellocfd}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="0" y="181" width="555" height="48" uuid="053d5ce7-6e08-4bf8-ab3c-a34c53f2aab8">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<box leftPadding="2">
@@ -1154,13 +1165,10 @@ byu6z7gG2B9A==]]></text>
 				<textElement>
 					<font size="8"/>
 				</textElement>
-				<text><![CDATA[nB5MuwyA7OX6VzQRNzmKG/1+nrC76k46E6NcRIwQo6KGttx1S3oZxqcFjQSB4MHhAgensRAQ8vjOb9AAF9rKoxJJz27dZGn6LLCinHK18
-W8HqffArEcQ+LyQZd7dS39jieVEVAmrEtyOpjjuS+6SEYJeJZCZ+HxzCgMOYvv6BHaRVntb8+t7qnW1jAipFhhnGSiWZkhXHzb0A7xwjDqgQ
-9gMt6eutphkB92HPkwc6apxt5mo9oNoZjdRHXD14eRWiW/pWPW4111SFvNJyRm2h+e2XOOCJyC+bafBJLuIcoa+oneR+NAN44KNJ1TIxyd
-x3ZmLtpnGlwWpchGwD433Pw==]]></text>
-			</staticText>
-			<staticText>
-				<reportElement x="0" y="255" width="555" height="48" uuid="a8406fc2-66df-4da5-8df5-ccd1c7115b65">
+				<textFieldExpression><![CDATA[$F{sellosat}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="0" y="255" width="555" height="48" uuid="65e00bc6-d020-4ea3-94ab-3b548e5b458b">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<box leftPadding="2">
@@ -1172,12 +1180,8 @@ x3ZmLtpnGlwWpchGwD433Pw==]]></text>
 				<textElement>
 					<font size="8"/>
 				</textElement>
-				<text><![CDATA[||1.1|48EA6E3D-0E43-45A4-B169-3F7828F74009|2025-07-15T10:41:16|IHYIy5UdBiWUfZV5kR+1ClKASQCWFtxmDE9fTpXaBZTbzaNb12knt6RK2+m/jUho8U+mOtwXzo
-nnjMh9wXXpgzS4p3ytzh7VIF4hJojdy1CH4QAoDXcDPpVumzAPfBj9PjjXMLp3/2TvS44Z11yScVo0SD4yM5oJZAuWwMteKx93i9dtiVJyAFC8UpJYxYnKuHZ54z7SXkADdLt
-36LM6o15HMqSdqNBP3P0Vi1L7KazPPQyG6jS0CTcI2BrDZ/F/lUtg18KX/8iv+X0e/h5/cZIYluHZzI/iYay8fVGF1azfgJh035RHMpo5fcN4ZDN/5MI2oc+gkbbyu6z7gG2B9A==|0
-0001000000710052019||
-]]></text>
-			</staticText>
+				<textFieldExpression><![CDATA[$F{cadena_certificado_sat}]]></textFieldExpression>
+			</textField>
 			<staticText>
 				<reportElement x="0" y="308" width="555" height="12" uuid="6de99a65-27a3-4689-a1b2-1ec75a76987f">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
@@ -1340,7 +1344,7 @@ nnjMh9wXXpgzS4p3ytzh7VIF4hJojdy1CH4QAoDXcDPpVumzAPfBj9PjjXMLp3/2TvS44Z11yScVo0SD
 ]]></text>
 			</staticText>
 			<staticText>
-				<reportElement mode="Opaque" x="0" y="177" width="555" height="12" forecolor="#FFFFFF" backcolor="#244E73" uuid="5fdc0163-b39e-4eed-b7ab-ac3b7f6fbd4d">
+				<reportElement mode="Opaque" x="0" y="169" width="555" height="12" forecolor="#FFFFFF" backcolor="#244E73" uuid="5fdc0163-b39e-4eed-b7ab-ac3b7f6fbd4d">
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<box leftPadding="2"/>
@@ -1360,11 +1364,23 @@ nnjMh9wXXpgzS4p3ytzh7VIF4hJojdy1CH4QAoDXcDPpVumzAPfBj9PjjXMLp3/2TvS44Z11yScVo0SD
 				<text><![CDATA[Cadena Original de Certificado Digital del SAT]]></text>
 			</staticText>
 			<line>
-				<reportElement positionType="FixRelativeToBottom" x="0" y="170" width="555" height="1" uuid="c4b7ce12-cebf-4422-8091-f8a68d871ea5"/>
+				<reportElement positionType="FixRelativeToBottom" x="0" y="160" width="555" height="1" uuid="c4b7ce12-cebf-4422-8091-f8a68d871ea5"/>
 				<graphicElement>
 					<pen lineWidth="0.5" lineColor="#999999"/>
 				</graphicElement>
 			</line>
+			<componentElement>
+				<reportElement x="0" y="80" width="112" height="69" uuid="e6595b2c-f235-47c0-a359-a50ba65d867e"/>
+				<jr:QRCode xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd">
+					<jr:codeExpression><![CDATA[$F{sellocfd}]]></jr:codeExpression>
+				</jr:QRCode>
+			</componentElement>
+			<rectangle>
+				<reportElement mode="Transparent" x="0" y="80" width="111" height="68" uuid="c6aba5d1-13be-479c-b98d-9e2d95b68cdc"/>
+				<graphicElement>
+					<pen lineWidth="0.25"/>
+				</graphicElement>
+			</rectangle>
 		</band>
 	</columnFooter>
 	<pageFooter>
