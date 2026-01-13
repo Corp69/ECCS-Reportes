@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Created with Jaspersoft Studio version 6.20.6.final using JasperReports Library version 6.20.6-5c96b6aa8a39ac1dc6b6bea4b81168e16dd39231  -->
-<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="Cherry" pageWidth="595" pageHeight="842" columnWidth="535" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="13acf49e-4913-4d1b-bccc-113817ad15d1">
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="Factura_v1" pageWidth="595" pageHeight="842" columnWidth="535" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="13acf49e-4913-4d1b-bccc-113817ad15d1">
 	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="DEV"/>
 	<property name="com.jaspersoft.studio.data.sql.tables" value=""/>
 	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w1" value="189"/>
 	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w2" value="806"/>
+	<property name="com.jaspersoft.studio.report.description" value=""/>
+	<property name="com.jaspersoft.studio.property.dataset.dialog.DatasetDialog.sash.w1" value="671"/>
+	<property name="com.jaspersoft.studio.property.dataset.dialog.DatasetDialog.sash.w2" value="319"/>
 	<style name="Title" forecolor="#FFFFFF" fontName="Times New Roman" fontSize="50" isBold="false"/>
 	<style name="SubTitle" forecolor="#CCCCCC" fontName="Times New Roman" fontSize="18" isBold="false"/>
 	<style name="Column header" forecolor="#666666" fontName="Times New Roman" fontSize="14" isBold="true"/>
@@ -15,6 +18,10 @@
 			<style mode="Opaque" backcolor="#F0EFEF"/>
 		</conditionalStyle>
 	</style>
+	<parameter name="ID_COMPROBANTE" class="java.lang.Integer" evaluationTime="Early">
+		<parameterDescription><![CDATA[Ingresa el numero de comprobante de venta]]></parameterDescription>
+		<defaultValueExpression><![CDATA[-1]]></defaultValueExpression>
+	</parameter>
 	<queryString>
 		<![CDATA[SELECT
     eccs_cliente.imagen as logo,
@@ -136,7 +143,7 @@ FROM eccs_comprobante_venta
         AND sat_impuesto_retencion.traslado = false
         AND sat_impuesto_retencion.retencion = true
     LEFT JOIN sat_tipo_factor sat_tipo_factor_retencion ON sat_tipo_factor_retencion.id = sat_impuesto_retencion.id_sat_tipo_factor
-WHERE eccs_comprobante_venta.id = 30
+WHERE eccs_comprobante_venta.id =  $P{ID_COMPROBANTE} 
 GROUP BY
     eccs_cliente.imagen,
     eccs_comprobante_venta.cadena_certificado_sat,
@@ -378,7 +385,7 @@ GROUP BY
 			<textField>
 				<reportElement x="112" y="50" width="238" height="20" uuid="e9cf3206-2fbf-4d30-8e00-ec8da7d0f141"/>
 				<textElement textAlignment="Center">
-					<font size="10" isBold="true"/>
+					<font fontName="SansSerif" size="12" isBold="true"/>
 				</textElement>
 				<textFieldExpression><![CDATA["R.F.C.: "+$F{rfcemisor}]]></textFieldExpression>
 			</textField>
@@ -394,7 +401,7 @@ GROUP BY
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<textElement textAlignment="Center">
-					<font size="8" isBold="true"/>
+					<font fontName="SansSerif" size="10" isBold="true"/>
 				</textElement>
 				<textFieldExpression><![CDATA[$F{emisordomicilio}]]></textFieldExpression>
 			</textField>
@@ -403,7 +410,7 @@ GROUP BY
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<textElement textAlignment="Center">
-					<font size="8" isBold="true"/>
+					<font fontName="SansSerif" size="10" isBold="true"/>
 				</textElement>
 				<textFieldExpression><![CDATA["TEL.:"+$F{telefonosucursal}]]></textFieldExpression>
 			</textField>
@@ -412,7 +419,7 @@ GROUP BY
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<textElement textAlignment="Center">
-					<font size="8" isBold="true"/>
+					<font fontName="SansSerif" size="10" isBold="true"/>
 				</textElement>
 				<textFieldExpression><![CDATA[$F{regimenfiscalemisor}]]></textFieldExpression>
 			</textField>
@@ -426,7 +433,7 @@ GROUP BY
 				</reportElement>
 				<box leftPadding="2"/>
 				<textElement textAlignment="Center" verticalAlignment="Middle">
-					<font size="12"/>
+					<font size="10"/>
 				</textElement>
 				<text><![CDATA[FACTURA]]></text>
 			</staticText>
@@ -436,7 +443,7 @@ GROUP BY
 				</reportElement>
 				<box leftPadding="2"/>
 				<textElement textAlignment="Center">
-					<font size="10"/>
+					<font size="8"/>
 				</textElement>
 				<textFieldExpression><![CDATA[$F{folio}]]></textFieldExpression>
 			</textField>
@@ -446,7 +453,7 @@ GROUP BY
 				</reportElement>
 				<box leftPadding="2"/>
 				<textElement textAlignment="Center">
-					<font size="10"/>
+					<font size="8"/>
 				</textElement>
 				<text><![CDATA[Certificado Emisor]]></text>
 			</staticText>
@@ -454,7 +461,7 @@ GROUP BY
 				<reportElement x="350" y="100" width="205" height="15" uuid="17bf9585-3b5e-42f4-8c26-4cd66d4695a9"/>
 				<box leftPadding="2"/>
 				<textElement textAlignment="Center">
-					<font size="10"/>
+					<font size="8"/>
 				</textElement>
 				<textFieldExpression><![CDATA[$F{numerocertificado}]]></textFieldExpression>
 			</textField>
@@ -462,7 +469,7 @@ GROUP BY
 				<reportElement mode="Opaque" x="350" y="115" width="205" height="15" forecolor="#FFFFFF" backcolor="#244E73" uuid="dcd52daf-a69f-4048-8cb8-4698740f03b7"/>
 				<box leftPadding="2"/>
 				<textElement textAlignment="Center">
-					<font size="10"/>
+					<font size="8"/>
 				</textElement>
 				<text><![CDATA[Folio Fiscal]]></text>
 			</staticText>
@@ -470,7 +477,7 @@ GROUP BY
 				<reportElement x="350" y="130" width="205" height="15" uuid="47845a4e-ee65-48aa-afb9-5884059ab6e7"/>
 				<box leftPadding="2"/>
 				<textElement textAlignment="Center">
-					<font size="10"/>
+					<font size="8"/>
 				</textElement>
 				<textFieldExpression><![CDATA[$F{uuid}]]></textFieldExpression>
 			</textField>
@@ -478,7 +485,7 @@ GROUP BY
 				<reportElement mode="Opaque" x="350" y="145" width="205" height="15" forecolor="#FFFFFF" backcolor="#244E73" uuid="b53c5a79-fcea-4869-886e-a34f6a0abc80"/>
 				<box leftPadding="2"/>
 				<textElement textAlignment="Center">
-					<font size="10"/>
+					<font size="8"/>
 				</textElement>
 				<text><![CDATA[Fecha Timbrado]]></text>
 			</staticText>
@@ -486,7 +493,7 @@ GROUP BY
 				<reportElement x="350" y="160" width="205" height="15" uuid="5ba1c016-ec56-4782-b1ab-0be013a5179e"/>
 				<box leftPadding="2"/>
 				<textElement textAlignment="Center">
-					<font size="10"/>
+					<font size="8"/>
 				</textElement>
 				<textFieldExpression><![CDATA[$F{fechatimbrado}]]></textFieldExpression>
 			</textField>
@@ -508,6 +515,16 @@ GROUP BY
 				</reportElement>
 				<box leftPadding="2"/>
 				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="8"/>
+				</textElement>
+				<text><![CDATA[]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="0" y="0" width="555" height="12" forecolor="#FFFFFF" backcolor="#244E73" uuid="ca5878cc-7a28-48bf-9d7e-225c9822fb91">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<box leftPadding="2"/>
+				<textElement textAlignment="Left">
 					<font size="8"/>
 				</textElement>
 				<text><![CDATA[]]></text>
