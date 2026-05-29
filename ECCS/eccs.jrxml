@@ -13,10 +13,10 @@
 		<![CDATA[]]>
 	</queryString>
 	<title>
-		<band height="100" splitType="Stretch">
+		<band height="101" splitType="Stretch">
 			<image scaleImage="RealHeight" hAlign="Center" vAlign="Top" isLazy="true">
-				<reportElement x="36" y="-20" width="170" height="120" uuid="244d598a-ec19-4902-bb10-96ec8ef1cab9"/>
-				<imageExpression><![CDATA["C:/Users/Corpsey69/OneDrive/Music/ECCS/ECCS.png"]]></imageExpression>
+				<reportElement x="11" y="-19" width="220" height="120" uuid="244d598a-ec19-4902-bb10-96ec8ef1cab9"/>
+				<imageExpression><![CDATA["C:/Users/eliza/Documents/ECCS-LOGOS/ECCS.png"]]></imageExpression>
 			</image>
 		</band>
 	</title>

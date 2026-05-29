@@ -24,7 +24,7 @@
 				<textElement textAlignment="Center">
 					<font fontName="Arial" size="10"/>
 				</textElement>
-				<text><![CDATA[TEL: 4651068560 |  DIAGNÓSTICO AUTOMOTRIZ]]></text>
+				<text><![CDATA[TEL: 4651068560 |  SOLUCIONES TI.]]></text>
 			</staticText>
 			<componentElement>
 				<reportElement mode="Transparent" x="50" y="-20" width="150" height="88" uuid="5af9eebb-9888-40de-af44-cf0b276dcc07"/>
